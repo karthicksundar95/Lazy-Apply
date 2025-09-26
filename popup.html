@@ -22,12 +22,12 @@
             </div>
             <div class="header-right">
                 <div class="upload-buttons">
-                    <input type="file" id="coverLetterUpload" accept=".txt" style="display: none;">
-                    <input type="file" id="cvUpload" accept=".txt" style="display: none;">
-                    <button id="uploadCoverLetterBtn" class="upload-btn" title="Upload Cover Letter Template (.txt format only)">
+                    <input type="file" id="coverLetterUpload" accept=".html,.htm" style="display: none;">
+                    <input type="file" id="cvUpload" accept=".html,.htm" style="display: none;">
+                    <button id="uploadCoverLetterBtn" class="upload-btn" title="Upload Cover Letter Template (.html format)">
                         📄 Cover Letter
                     </button>
-                    <button id="uploadCvBtn" class="upload-btn" title="Upload CV Template (.txt format only)">
+                    <button id="uploadCvBtn" class="upload-btn" title="Upload CV Template (.html format)">
                         📋 CV Template
                     </button>
                 </div>
@@ -35,10 +35,10 @@
                     😴 I am lazy
                 </button>
                 <div id="downloadButtons" class="download-buttons-header" style="display: none;">
-                    <button id="downloadCvBtn" class="download-btn-header" onclick="app.downloadDocument('cv')" style="display: none;">
+                    <button id="downloadCvBtn" class="download-btn-header" style="display: none;">
                         📥 Download CV
                     </button>
-                    <button id="downloadCoverLetterBtn" class="download-btn-header" onclick="app.downloadDocument('coverLetter')" style="display: none;">
+                    <button id="downloadCoverLetterBtn" class="download-btn-header" style="display: none;">
                         📥 Download Cover Letter
                     </button>
                 </div>

@@ -90,6 +90,10 @@ class AIPromptProcessorPro {
         this.elements.toggleTextarea.addEventListener('click', () => this.toggleTextarea());
         this.elements.resetTextarea.addEventListener('click', () => this.resetTextarea());
         
+        // Download buttons
+        this.elements.downloadCvBtn.addEventListener('click', () => this.downloadDocument('cv'));
+        this.elements.downloadCoverLetterBtn.addEventListener('click', () => this.downloadDocument('coverLetter'));
+        
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
             if (e.ctrlKey || e.metaKey) {
@@ -270,14 +274,21 @@ class AIPromptProcessorPro {
                 
                 // Check if it's a binary file (like .docx) that can't be read as text
                 if (file.name.toLowerCase().endsWith('.docx') || file.name.toLowerCase().endsWith('.doc')) {
-                    reject(new Error(`Cannot read ${file.name} as text. Please convert to .txt format or copy-paste the content.`));
+                    reject(new Error(`Cannot read ${file.name} as text. Please convert to .html format or copy-paste the content.`));
                     return;
                 }
                 
                 // Check for binary content indicators
                 if (content.includes('PK') && content.includes('word/')) {
-                    reject(new Error(`File appears to be a Word document (.docx). Please convert to .txt format or copy-paste the content.`));
+                    reject(new Error(`File appears to be a Word document (.docx). Please convert to .html format or copy-paste the content.`));
                     return;
+                }
+                
+                // Validate HTML content
+                if (file.name.toLowerCase().endsWith('.html') || file.name.toLowerCase().endsWith('.htm')) {
+                    if (!content.includes('<html') && !content.includes('<HTML')) {
+                        console.warn('File has .html extension but may not contain valid HTML');
+                    }
                 }
                 
                 resolve(content);
@@ -328,7 +339,7 @@ Extract the job description:`;
         try {
             this.showLoading();
             this.logAction('🤖 Sending page content to AI for analysis...');
-            const result = await this.callAI(prompt, 'gpt-3.5-turbo', apiKey, settings);
+            const result = await this.callAI(prompt, 'gpt-3.5-turbo-16k', apiKey, settings);
             
             if (result.toLowerCase().includes('no job description found')) {
                 this.logAction('ℹ️ No job description found on this page');
@@ -418,8 +429,8 @@ Extract the job description:`;
         // Clear results content and show success message
         this.elements.resultsContent.innerHTML = `
             <div class="success-message">
-                <h3>🎉 Documents Generated Successfully!</h3>
-                <p>Your personalized documents are ready for download. Use the download buttons in the header above.</p>
+                <h3>🎉 PDF Documents Generated Successfully!</h3>
+                <p>Your personalized PDF documents with full formatting are ready for download. Use the download buttons in the header above.</p>
             </div>
         `;
         this.elements.resultsContent.classList.add('has-content');
@@ -430,9 +441,12 @@ Extract the job description:`;
     }
 
     downloadDocument(type) {
+        console.log(`🔍 DEBUG: downloadDocument called with type: ${type}`);
         this.logAction(`📥 Download requested for: ${type}`);
         
         if (!this.generatedDocuments || !this.generatedDocuments[type]) {
+            console.log(`❌ DEBUG: No ${type} document found in memory`);
+            console.log(`❌ DEBUG: generatedDocuments:`, this.generatedDocuments);
             this.logAction(`❌ No ${type} document found in memory`);
             this.showError(`No ${type} document available for download`);
             return;
@@ -440,46 +454,222 @@ Extract the job description:`;
         
         const content = this.generatedDocuments[type];
         const documentTitle = type === 'coverLetter' ? 'Cover_Letter' : 'CV_Resume';
-        const fileName = `${documentTitle}_${new Date().toISOString().split('T')[0]}.txt`;
+        const fileName = `${documentTitle}_${new Date().toISOString().split('T')[0]}.pdf`;
         
-        this.logAction(`📥 Creating download for ${fileName} (${content.length} characters)`);
+        console.log(`📥 DEBUG: Creating PDF download for ${fileName} (${content.length} characters)`);
+        this.logAction(`📥 Creating PDF download for ${fileName} (${content.length} characters)`);
         
+        // Use the new PDF generation function
+        this.generatePDFFromHTML(content, fileName, type);
+    }
+
+    generatePDFFromHTML(htmlContent, fileName, type) {
         try {
-            // Create blob with the content
-            const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+            // Log character count of input HTML
+            const inputCharCount = htmlContent.length;
+            this.logAction(`📊 Input HTML character count: ${inputCharCount.toLocaleString()}`);
+            console.log(`📊 DEBUG: Input HTML character count: ${inputCharCount.toLocaleString()}`);
             
-            // Create object URL
-            const url = URL.createObjectURL(blob);
+            this.logAction(`🎨 Generating PDF from raw LLM output (no post-processing)...`);
             
-            // Create temporary download link
-            const downloadLink = document.createElement('a');
-            downloadLink.href = url;
-            downloadLink.download = fileName;
-            downloadLink.style.display = 'none';
+            // Create a new window for PDF generation with specific features
+            const printWindow = window.open('', '_blank', 'width=800,height=600,scrollbars=yes,resizable=yes');
             
-            // Add to DOM, click, and remove
-            document.body.appendChild(downloadLink);
-            downloadLink.click();
-            document.body.removeChild(downloadLink);
+            if (!printWindow) {
+                throw new Error('Popup blocked. Please allow popups for this site.');
+            }
             
-            // Revoke object URL to free memory
+            // Use raw LLM output directly - check if it's already a complete HTML document
+            let completeHTML;
+            
+            if (htmlContent.includes('<!DOCTYPE html>') || htmlContent.includes('<html')) {
+                // LLM output is already a complete HTML document
+                this.logAction('📄 LLM output is already a complete HTML document');
+                completeHTML = htmlContent;
+            } else {
+                // LLM output needs basic HTML wrapper
+                this.logAction('📄 Adding basic HTML wrapper to LLM output');
+                completeHTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${fileName}</title>
+    <style>
+        @media print {
+            * {
+                -webkit-print-color-adjust: exact !important;
+                color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            
+            body {
+                margin: 0 !important;
+                padding: 20px !important;
+                font-size: 12pt !important;
+                line-height: 1.4 !important;
+                color: #000 !important;
+                background: #fff !important;
+                max-width: none !important;
+                overflow: visible !important;
+            }
+            
+            .page-break {
+                page-break-before: always !important;
+            }
+            
+            .no-break {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            }
+            
+            h1, h2, h3, h4, h5, h6 {
+                page-break-after: avoid !important;
+                break-after: avoid !important;
+            }
+            
+            p, li, div {
+                orphans: 3 !important;
+                widows: 3 !important;
+            }
+            
+            ul, ol {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            }
+            
+            table {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            }
+            
+            img {
+                max-width: 100% !important;
+                height: auto !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            }
+            
+            .container, .wrapper, .content {
+                max-width: none !important;
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            
+            .section, .block, .item {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+                margin-bottom: 10pt !important;
+            }
+            
+            .flex, .grid {
+                display: block !important;
+            }
+            
+            .hidden-print {
+                display: none !important;
+            }
+        }
+        
+        @media screen {
+            body {
+                margin: 20px;
+                padding: 20px;
+                background: #f5f5f5;
+                font-family: Arial, sans-serif;
+            }
+            
+            .print-preview {
+                max-width: 8.5in;
+                margin: 0 auto;
+                background: white;
+                box-shadow: 0 0 10px rgba(0,0,0,0.1);
+                padding: 40px;
+            }
+            
+            .print-button {
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: #007bff;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 5px;
+                cursor: pointer;
+                font-size: 16px;
+                z-index: 1000;
+            }
+            
+            .print-button:hover {
+                background: #0056b3;
+            }
+        }
+    </style>
+</head>
+<body>
+    <button class="print-button" onclick="window.print()">🖨️ Print to PDF</button>
+    <div class="print-preview">
+        ${htmlContent}
+    </div>
+    <script>
+        // Auto-trigger print dialog when page loads
+        window.onload = function() {
+            setTimeout(function() {
+                window.print();
+            }, 1000);
+        };
+        
+        // Close window after printing
+        window.onafterprint = function() {
+            setTimeout(function() {
+                window.close();
+            }, 500);
+        };
+    </script>
+</body>
+</html>`;
+            }
+            
+            // Log character count of complete HTML document
+            const completeHTMLCharCount = completeHTML.length;
+            this.logAction(`📊 Complete HTML document character count: ${completeHTMLCharCount.toLocaleString()}`);
+            console.log(`📊 DEBUG: Complete HTML document character count: ${completeHTMLCharCount.toLocaleString()}`);
+            
+            // Write the HTML content to the new window
+            printWindow.document.write(completeHTML);
+            
+            printWindow.document.close();
+            
+            // Wait for content to load, then trigger print
             setTimeout(() => {
-                URL.revokeObjectURL(url);
-                this.logAction(`🗑️ Object URL revoked for ${fileName}`);
+                printWindow.focus();
+                
+                // Try to trigger print dialog
+                try {
+                    printWindow.print();
+                } catch (e) {
+                    console.log('Print dialog blocked, showing manual print button');
+                    this.logAction('Print dialog blocked, please click the print button in the new window');
+                }
+                
+                console.log(`✅ DEBUG: PDF generation initiated for ${fileName}`);
+                this.logAction(`✅ PDF generation initiated for ${fileName}`);
+                this.logAction(`📊 Character count summary: Input=${inputCharCount.toLocaleString()}, Complete HTML=${completeHTMLCharCount.toLocaleString()}`);
+                this.showToast(`${type === 'coverLetter' ? 'Cover Letter' : 'CV'} PDF generation started!`, 'success');
+                
             }, 1000);
             
-            this.logAction(`✅ Download initiated for ${fileName}`);
-            this.showToast(`${type === 'coverLetter' ? 'Cover Letter' : 'CV'} downloaded successfully!`, 'success');
-            
         } catch (error) {
-            console.error('Download error:', error);
-            this.logAction(`❌ Download failed: ${error.message}`);
-            this.showError(`Failed to download ${type}: ${error.message}`);
+            console.error('❌ DEBUG: PDF generation error:', error);
+            this.logAction(`❌ PDF generation failed: ${error.message}`);
+            this.showError(`Failed to generate PDF for ${type}: ${error.message}`);
         }
     }
 
     async callAI(prompt, model, apiKey, settings) {
-        if (model === 'openai' || model === 'gpt-3.5-turbo') {
+        if (model === 'openai' || model === 'gpt-3.5-turbo' || model === 'gpt-3.5-turbo-16k') {
             return await this.callOpenAI(prompt, apiKey, settings);
         } else if (model === 'gemini-2.0-flash') {
             return await this.callGemini(prompt, apiKey, settings, 'gemini-2.0-flash-exp');
@@ -499,7 +689,7 @@ Extract the job description:`;
                 'Authorization': `Bearer ${apiKey}`
             },
             body: JSON.stringify({
-                model: 'gpt-3.5-turbo',
+                model: 'gpt-3.5-turbo-16k',
                 messages: [{ role: 'user', content: prompt }],
                 max_tokens: parseInt(settings.maxTokens),
                 temperature: parseFloat(settings.temperature)
@@ -723,6 +913,220 @@ Extract the job description:`;
         this.logAction('🗑️ Textarea cleared');
         this.showToast('Text area cleared!', 'success');
     }
+
+    addPrintOptimizedCSS(htmlContent) {
+        this.logAction('🎨 Adding print-optimized CSS to prevent PDF truncation...');
+        
+        // Log input HTML content length
+        const inputLength = htmlContent.length;
+        this.logAction(`📊 Input HTML to addPrintOptimizedCSS: ${inputLength.toLocaleString()} characters`);
+        console.log(`📊 DEBUG: Input HTML to addPrintOptimizedCSS: ${inputLength.toLocaleString()} characters`);
+        
+        // Define print-optimized CSS
+        const printCSS = `
+        <style>
+        @media print {
+            * {
+                -webkit-print-color-adjust: exact !important;
+                color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            
+            body {
+                margin: 0 !important;
+                padding: 20px !important;
+                font-size: 12pt !important;
+                line-height: 1.4 !important;
+                color: #000 !important;
+                background: #fff !important;
+                max-width: none !important;
+                overflow: visible !important;
+            }
+            
+            .page-break {
+                page-break-before: always !important;
+            }
+            
+            .no-break {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            }
+            
+            h1, h2, h3, h4, h5, h6 {
+                page-break-after: avoid !important;
+                break-after: avoid !important;
+            }
+            
+            p, li, div {
+                orphans: 3 !important;
+                widows: 3 !important;
+            }
+            
+            ul, ol {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            }
+            
+            table {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            }
+            
+            img {
+                max-width: 100% !important;
+                height: auto !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            }
+            
+            .container, .wrapper, .content {
+                max-width: none !important;
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            
+            /* Ensure content doesn't get cut off */
+            .section, .block, .item {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+                margin-bottom: 10pt !important;
+            }
+            
+            /* Fix common layout issues */
+            .flex, .grid {
+                display: block !important;
+            }
+            
+            .hidden-print {
+                display: none !important;
+            }
+        }
+        
+        /* Screen styles for better viewing */
+        @media screen {
+            body {
+                margin: 20px;
+                padding: 20px;
+                background: #f5f5f5;
+                font-family: Arial, sans-serif;
+            }
+            
+            .print-preview {
+                max-width: 8.5in;
+                margin: 0 auto;
+                background: white;
+                box-shadow: 0 0 10px rgba(0,0,0,0.1);
+                padding: 40px;
+            }
+        }
+        </style>`;
+        
+        // Insert CSS into the HTML
+        let processedHTML = htmlContent;
+        
+        // If HTML has a <head> section, insert CSS there
+        if (processedHTML.includes('<head>')) {
+            processedHTML = processedHTML.replace('<head>', `<head>${printCSS}`);
+        } else if (processedHTML.includes('<html>')) {
+            processedHTML = processedHTML.replace('<html>', `<html><head>${printCSS}</head>`);
+        } else {
+            // If no proper HTML structure, wrap the content
+            processedHTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    ${printCSS}
+</head>
+<body>
+    ${processedHTML}
+</body>
+</html>`;
+        }
+        
+        // Log the final processed HTML length
+        const finalLength = processedHTML.length;
+        const cssLength = printCSS.length;
+        this.logAction(`📊 CSS added: ${cssLength.toLocaleString()} characters`);
+        this.logAction(`📊 Final processed HTML: ${finalLength.toLocaleString()} characters`);
+        console.log(`📊 DEBUG: CSS added: ${cssLength.toLocaleString()} characters`);
+        console.log(`📊 DEBUG: Final processed HTML: ${finalLength.toLocaleString()} characters`);
+        
+        this.logAction('✅ Print-optimized CSS added successfully');
+        return processedHTML;
+    }
+
+    // Test function to verify download functionality
+    testDownload() {
+        console.log('🧪 DEBUG: Testing download functionality...');
+        this.logAction('🧪 Testing download functionality...');
+        
+        // Create test HTML content
+        const testContent = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Document</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
+        h1 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
+        .timestamp { color: #7f8c8d; font-style: italic; }
+    </style>
+</head>
+<body>
+    <h1>Test Document for Download Functionality</h1>
+    <p>This is a test HTML document to verify download functionality.</p>
+    <p class="timestamp">Generated at: ${new Date().toISOString()}</p>
+</body>
+</html>`;
+        const fileName = `Test_Document_${new Date().toISOString().split('T')[0]}.html`;
+        
+        try {
+            // Create blob with the test HTML content
+            const blob = new Blob([testContent], { type: 'text/html;charset=utf-8' });
+            console.log('📦 DEBUG: Test blob created:', blob);
+            
+            // Create object URL
+            const url = URL.createObjectURL(blob);
+            console.log('🔗 DEBUG: Test object URL created:', url);
+            
+            // Create temporary download link
+            const downloadLink = document.createElement('a');
+            downloadLink.href = url;
+            downloadLink.download = fileName;
+            downloadLink.style.display = 'none';
+            
+            console.log('🔗 DEBUG: Test download link created:', downloadLink);
+            
+            // Add to DOM, click, and remove
+            document.body.appendChild(downloadLink);
+            console.log('📎 DEBUG: Test link added to DOM');
+            
+            downloadLink.click();
+            console.log('👆 DEBUG: Test link clicked');
+            
+            document.body.removeChild(downloadLink);
+            console.log('🗑️ DEBUG: Test link removed from DOM');
+            
+            // Revoke object URL to free memory
+            setTimeout(() => {
+                URL.revokeObjectURL(url);
+                console.log('🗑️ DEBUG: Test object URL revoked');
+            }, 1000);
+            
+            console.log('✅ DEBUG: Test download completed');
+            this.logAction('✅ Test download completed successfully');
+            this.showToast('Test download completed!', 'success');
+            
+        } catch (error) {
+            console.error('❌ DEBUG: Test download error:', error);
+            this.logAction(`❌ Test download failed: ${error.message}`);
+            this.showError(`Test download failed: ${error.message}`);
+        }
+    }
 }
 
 // Initialize the application
@@ -849,7 +1253,7 @@ Classify this page as one of these types:
 
 Respond with only the classification:`;
 
-        const result = await this.app.callAI(prompt, 'gpt-3.5-turbo', this.apiKey, this.settings);
+        const result = await this.app.callAI(prompt, 'gpt-3.5-turbo-16k', this.apiKey, this.settings);
         this.app.logAction(`🔍 Tool Result: Page identified as "${result.trim()}"`);
         return result.trim();
     }
@@ -894,7 +1298,7 @@ Instructions:
 
 Extract the job description:`;
 
-        const result = await this.app.callAI(prompt, 'gpt-3.5-turbo', this.apiKey, this.settings);
+        const result = await this.app.callAI(prompt, 'gpt-3.5-turbo-16k', this.apiKey, this.settings);
         this.app.logAction(`📋 Tool Result: Job description extraction completed`);
         return result;
     }
@@ -963,7 +1367,7 @@ CRITICAL ANALYSIS INSTRUCTIONS:
 
 RESPOND WITH EXACTLY ONE WORD: CV_ONLY, COVER_LETTER_ONLY, BOTH, or NONE`;
 
-        const result = await this.app.callAI(prompt, 'gpt-3.5-turbo', this.apiKey, this.settings);
+        const result = await this.app.callAI(prompt, 'gpt-3.5-turbo-16k', this.apiKey, this.settings);
         this.app.logAction(`📄 Tool Result: Document requirements identified as "${result.trim()}"`);
         return result.trim();
     }
@@ -982,27 +1386,72 @@ RESPOND WITH EXACTLY ONE WORD: CV_ONLY, COVER_LETTER_ONLY, BOTH, or NONE`;
         this.app.logAction(`📄 ${this.app.uploadedTemplates.cv.content.substring(0, 200)}${this.app.uploadedTemplates.cv.content.length > 200 ? '...' : ''}`);
         this.app.logAction(`📄 CV Template Length: ${this.app.uploadedTemplates.cv.content.length} characters`);
 
-        const prompt = `You are a professional resume writer. Using the provided CV template and job description, optimize the CV to match the job requirements.
+        const prompt = `You are a professional resume writer. Your task is to optimize the provided CV content to better match the job requirements while maintaining the EXACT same structure, length, and factual accuracy.
 
-CV Template:
+CONTEXT - COMPLETE CV TEMPLATE:
 ${this.app.uploadedTemplates.cv.content}
 
-Job Description:
+REFERENCE - JOB DESCRIPTION:
 ${params.jobDescription}
 
-Instructions:
-1. Keep the same structure and format as the template
-2. Optimize the content to highlight relevant skills and experiences
-3. Reorder sections if needed to emphasize job-relevant information
-4. Adjust the language to match the job requirements
-5. Keep all personal information intact
-6. Return only the final CV content, no additional text`;
+CRITICAL REQUIREMENTS:
+1. OUTPUT LENGTH: Your output must be approximately the same length as the input CV template (${this.app.uploadedTemplates.cv.content.length} characters)
+2. NO TRUNCATION: Include ALL sections, experiences, skills, and content from the original CV
+3. EXACT STRUCTURE: Keep the EXACT same HTML structure, CSS classes, and formatting
+4. FACTUAL ACCURACY: NEVER add, remove, or modify any factual information (dates, company names, job titles, project names, technologies, achievements, etc.)
+5. NO HALLUCINATION: NEVER invent any work experience, projects, skills, or accomplishments
 
-        this.app.logAction('🤖 Sending CV template and job description to OpenAI GPT-3.5-turbo...');
-        const result = await this.app.callAI(prompt, 'gpt-3.5-turbo', this.apiKey, this.settings);
+OPTIMIZATION TASK - TWEAK EACH SECTION:
+For each section of the CV, optimize the content to highlight relevance to the job description:
+
+1. PROFESSIONAL SUMMARY: Rephrase to emphasize skills and experiences that match the job requirements
+2. SKILLS SECTION: Reorder and rephrase skills to highlight those mentioned in the job description
+3. WORK EXPERIENCE: For each job experience:
+   - Rephrase job descriptions to emphasize relevant skills and achievements
+   - Adjust bullet points to highlight experiences that match job requirements
+   - Use keywords from the job description where appropriate
+   - Maintain the same level of detail and content volume
+4. PROJECTS: Rephrase project descriptions to emphasize relevant technologies and outcomes
+5. EDUCATION: Keep as-is unless directly relevant to job requirements
+
+OPTIMIZATION EXAMPLES:
+- Original: "Developed web applications using various technologies"
+- Optimized: "Developed scalable web applications using React, Node.js, and MongoDB, focusing on user experience and performance optimization"
+- Structure and length remain the same, but content is optimized for relevance
+
+OUTPUT REQUIREMENTS:
+- Return the COMPLETE optimized HTML document
+- Maintain approximately the same character count as input
+- Include ALL original content, just rephrased and optimized
+- No additional text or explanations
+- No truncation or content removal`;
+
+        this.app.logAction('🤖 Sending CV template and job description to OpenAI GPT-3.5-turbo-16k...');
+        const result = await this.app.callAI(prompt, 'gpt-3.5-turbo-16k', this.apiKey, this.settings);
+        
+        // Log LLM output character count and preview
+        const llmOutputCharCount = result.length;
+        this.app.logAction(`📊 LLM Output character count: ${llmOutputCharCount.toLocaleString()}`);
+        console.log(`📊 DEBUG: LLM Output character count: ${llmOutputCharCount.toLocaleString()}`);
+        
+        // Log a preview of the LLM output to see if it's truncated
+        const llmPreview = result.substring(0, 500);
+        this.app.logAction(`📊 LLM Output Preview: ${llmPreview}${result.length > 500 ? '...' : ''}`);
+        console.log(`📊 DEBUG: LLM Output Preview: ${llmPreview}${result.length > 500 ? '...' : ''}`);
+        
+        // Log the end of the LLM output to check for truncation
+        if (result.length > 1000) {
+            const llmEnd = result.substring(result.length - 500);
+            this.app.logAction(`📊 LLM Output End: ...${llmEnd}`);
+            console.log(`📊 DEBUG: LLM Output End: ...${llmEnd}`);
+        }
+        
         this.app.logAction('📋 Tool Result: CV document generated successfully');
         
-        // Show download button
+        // Use LLM output directly without post-processing
+        this.app.logAction('✅ Using LLM output directly without post-processing');
+        
+        // Show download button with raw LLM output
         this.app.showDocumentDownloads({ cv: result });
         return result;
     }
@@ -1021,27 +1470,76 @@ Instructions:
         this.app.logAction(`📄 ${this.app.uploadedTemplates.coverLetter.content.substring(0, 200)}${this.app.uploadedTemplates.coverLetter.content.length > 200 ? '...' : ''}`);
         this.app.logAction(`📄 Cover Letter Template Length: ${this.app.uploadedTemplates.coverLetter.content.length} characters`);
 
-        const prompt = `You are a professional resume writer. Using the provided cover letter template and job description, create a personalized cover letter that matches the job requirements.
+        const prompt = `You are a professional resume writer. Using the provided HTML cover letter template and job description, create a personalized cover letter that matches the job requirements while maintaining the exact same structure and factual accuracy.
 
-Cover Letter Template:
+HTML Cover Letter Template:
 ${this.app.uploadedTemplates.coverLetter.content}
 
 Job Description:
 ${params.jobDescription}
 
-Instructions:
-1. Keep the same structure and format as the template
-2. Replace placeholder content with job-specific information
-3. Highlight relevant skills and experiences that match the job requirements
-4. Maintain professional tone and language
-5. Keep the letter concise but impactful
-6. Return only the final cover letter content, no additional text`;
+CRITICAL INSTRUCTIONS - MAINTAIN STRUCTURE AND FACTUAL ACCURACY:
+1. Keep the EXACT same HTML structure, CSS classes, and formatting as the template
+2. NEVER add, remove, or modify any factual information (personal details, work experience, skills, achievements, etc.)
+3. NEVER hallucinate or invent any work experience, projects, skills, or accomplishments
+4. Keep all personal information intact
 
-        this.app.logAction('🤖 Sending cover letter template and job description to OpenAI GPT-3.5-turbo...');
-        const result = await this.app.callAI(prompt, 'gpt-3.5-turbo', this.apiKey, this.settings);
+CONTENT OPTIMIZATION REQUIRED:
+5. Replace placeholder content with job-specific information (using only existing facts from the template)
+6. Optimize the content to highlight relevant skills and experiences that match the job requirements
+7. Adjust language and emphasis to better align with the job description
+8. Use keywords and phrases from the job description where appropriate
+9. Maintain professional tone and language
+10. Keep the letter concise but impactful
+
+SPECIFIC OPTIMIZATION EXAMPLES:
+- If job requires "Python development", emphasize Python experience
+- If job requires "team leadership", highlight leadership experiences
+- If job requires "data analysis", emphasize analytical skills
+- If job requires "cloud technologies", highlight relevant cloud experience
+
+TECHNICAL REQUIREMENTS:
+11. Maintain all HTML tags, CSS classes, and styling exactly as in the template
+12. Add print-friendly CSS to ensure proper PDF generation:
+    - Use @media print rules for print optimization
+    - Set page-break-inside: avoid for sections
+    - Use page-break-before: auto for new sections
+    - Set margins and padding for print
+    - Ensure content fits within page boundaries
+
+EXAMPLE OF CONTENT OPTIMIZATION:
+- Original: "I have experience in software development"
+- Optimized: "My experience in software development, particularly in [specific technology mentioned in template], aligns well with your requirements for [specific job requirement]"
+- Structure remains the same, but content is optimized for relevance
+
+Return only the complete HTML document, no additional text or explanations`;
+
+        this.app.logAction('🤖 Sending cover letter template and job description to OpenAI GPT-3.5-turbo-16k...');
+        const result = await this.app.callAI(prompt, 'gpt-3.5-turbo-16k', this.apiKey, this.settings);
+        
+        // Log LLM output character count and preview
+        const llmOutputCharCount = result.length;
+        this.app.logAction(`📊 LLM Output character count: ${llmOutputCharCount.toLocaleString()}`);
+        console.log(`📊 DEBUG: LLM Output character count: ${llmOutputCharCount.toLocaleString()}`);
+        
+        // Log a preview of the LLM output to see if it's truncated
+        const llmPreview = result.substring(0, 500);
+        this.app.logAction(`📊 LLM Output Preview: ${llmPreview}${result.length > 500 ? '...' : ''}`);
+        console.log(`📊 DEBUG: LLM Output Preview: ${llmPreview}${result.length > 500 ? '...' : ''}`);
+        
+        // Log the end of the LLM output to check for truncation
+        if (result.length > 1000) {
+            const llmEnd = result.substring(result.length - 500);
+            this.app.logAction(`📊 LLM Output End: ...${llmEnd}`);
+            console.log(`📊 DEBUG: LLM Output End: ...${llmEnd}`);
+        }
+        
         this.app.logAction('📄 Tool Result: Cover letter document generated successfully');
         
-        // Show download button
+        // Use LLM output directly without post-processing
+        this.app.logAction('✅ Using LLM output directly without post-processing');
+        
+        // Show download button with raw LLM output
         this.app.showDocumentDownloads({ coverLetter: result });
         return result;
     }
@@ -1049,6 +1547,17 @@ Instructions:
 
 document.addEventListener('DOMContentLoaded', () => {
     window.app = new AIPromptProcessorPro();
+    
+    // Expose test function globally for debugging
+    window.testDownload = () => {
+        if (window.app) {
+            window.app.testDownload();
+        } else {
+            console.error('App not initialized yet');
+        }
+    };
+    
+    console.log('🔧 DEBUG: Extension loaded. Use testDownload() to test download functionality.');
 });
 
 
