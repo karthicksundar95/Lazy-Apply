@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Icon Generator</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #f0f0f0;
+            font-family: Arial, sans-serif;
+        }
+        .icon-container {
+            display: inline-block;
+            margin: 10px;
+            text-align: center;
+        }
+        .icon {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .icon-16 { width: 16px; height: 16px; font-size: 8px; }
+        .icon-48 { width: 48px; height: 48px; font-size: 24px; }
+        .icon-128 { width: 128px; height: 128px; font-size: 64px; }
+    </style>
+</head>
+<body>
+    <h1>AI Prompt Processor Icons</h1>
+    <p>Right-click on each icon and "Save image as..." to save as PNG</p>
+    
+    <div class="icon-container">
+        <div class="icon icon-16">AI</div>
+        <div>16x16</div>
+    </div>
+    
+    <div class="icon-container">
+        <div class="icon icon-48">AI</div>
+        <div>48x48</div>
+    </div>
+    
+    <div class="icon-container">
+        <div class="icon icon-128">AI</div>
+        <div>128x128</div>
+    </div>
+    
+    <script>
+        // Convert divs to canvas for better icon quality
+        function createIcon(size, text) {
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            
+            // Create gradient
+            const gradient = ctx.createLinearGradient(0, 0, size, size);
+            gradient.addColorStop(0, '#667eea');
+            gradient.addColorStop(1, '#764ba2');
+            
+            // Draw background
+            ctx.fillStyle = gradient;
+            ctx.roundRect(0, 0, size, size, size * 0.15);
+            ctx.fill();
+            
+            // Draw text
+            ctx.fillStyle = 'white';
+            ctx.font = `bold ${size * 0.4}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, size/2, size/2);
+            
+            return canvas;
+        }
+        
+        // Replace div icons with canvas icons
+        document.querySelectorAll('.icon').forEach((icon, index) => {
+            const size = icon.classList.contains('icon-16') ? 16 : 
+                        icon.classList.contains('icon-48') ? 48 : 128;
+            const canvas = createIcon(size, 'AI');
+            icon.parentNode.replaceChild(canvas, icon);
+        });
+    </script>
+</body>
+</html>
