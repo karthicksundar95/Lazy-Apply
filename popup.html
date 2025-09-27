@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Prompt Processor Pro</title>
+    <title>Lazy Apply</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -17,7 +17,7 @@
                         <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
                         <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
                     </svg>
-                    <h1>AI Prompt Processor Pro</h1>
+                    <h1 class="app-title">Lazy Apply</h1>
                 </div>
             </div>
             <div class="header-right">
@@ -26,22 +26,21 @@
                     <input type="file" id="cvUpload" accept=".html,.htm" style="display: none;">
                     <button id="uploadCoverLetterBtn" class="upload-btn" title="Upload Cover Letter Template (.html format)">
                         📄 Cover Letter
+                        <span class="delete-btn" title="Remove cover letter" style="display: none;">×</span>
                     </button>
                     <button id="uploadCvBtn" class="upload-btn" title="Upload CV Template (.html format)">
                         📋 CV Template
+                        <span class="delete-btn" title="Remove CV" style="display: none;">×</span>
                     </button>
                 </div>
-                <button id="lazyBtn" class="lazy-btn" title="Extract job description from current page">
-                    😴 I am lazy
-                </button>
-                <div id="downloadButtons" class="download-buttons-header" style="display: none;">
-                    <button id="downloadCvBtn" class="download-btn-header" style="display: none;">
-                        📥 Download CV
-                    </button>
-                    <button id="downloadCoverLetterBtn" class="download-btn-header" style="display: none;">
-                        📥 Download Cover Letter
-                    </button>
-                </div>
+                    <div id="downloadButtons" class="download-buttons-header" style="display: none;">
+                        <button id="downloadCvBtn" class="download-btn-header" style="display: none;">
+                            📥 Download CV
+                        </button>
+                        <button id="downloadCoverLetterBtn" class="download-btn-header" style="display: none;">
+                            📥 Download Cover Letter
+                        </button>
+                    </div>
                 <button id="settingsBtn" class="icon-btn" title="Settings">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
@@ -56,12 +55,14 @@
             <!-- Left Panel - Input Section -->
             <section class="input-panel">
                 <div class="panel-header">
-                    <h2>Input & Configuration</h2>
+                    <button id="lazyBtn" class="lazy-scan-btn" title="Extract job description from current page">
+                        🔍 Lazy Scan
+                    </button>
                 </div>
                 
                 <div class="input-group">
                     <div class="textarea-header">
-                        <label for="userText" class="label">Your Text</label>
+                        <label for="userText" class="label">Job Description</label>
                         <div class="textarea-controls">
                             <button id="toggleTextarea" class="toggle-btn" title="Collapse/Expand">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -80,16 +81,26 @@
                     <textarea 
                         id="userText" 
                         class="textarea-input" 
-                        placeholder="Job description will appear here after using 'I am lazy' button or paste manually..."
+                        placeholder="Job description will appear here after using 'Lazy Scan' button or paste manually..."
                         rows="3"
                     ></textarea>
                 </div>
 
-                <button id="generateBtn" class="generate-button">
+                <button id="generateBtn" class="lazy-generate-btn">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M13 2L3 14H12L11 22L21 10H12L13 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
-                    Generate Documents
+                    Lazy Generate
+                </button>
+                <button id="fillItUpBtn" class="lazy-fill-btn" style="display: none;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M14 2V8H20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M16 13H8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M16 17H8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M10 9H8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    Lazy Fill
                 </button>
                 
                 <!-- Action Logs -->
@@ -99,26 +110,6 @@
                 </div>
             </section>
 
-            <!-- Right Panel - Results Section -->
-            <section class="results-panel">
-                <div id="resultsContent" class="results-content">
-                    <div class="empty-state">
-                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
-                            <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
-                            <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
-                        </svg>
-                        <h3>Ready to Process</h3>
-                        <p>Enter your text and click "Generate Documents" to get started</p>
-                    </div>
-                </div>
-
-                <div id="loadingState" class="loading-state" style="display: none;">
-                    <div class="loading-spinner"></div>
-                    <h3>Processing with AI...</h3>
-                    <p>Please wait while we generate your response</p>
-                </div>
-            </section>
         </main>
     </div>
 
@@ -158,7 +149,7 @@
                         <h3>⚙️ Advanced Settings</h3>
                         <div class="input-group">
                             <label for="maxTokens" class="label">Max Tokens</label>
-                            <input type="number" id="maxTokens" class="text-input" value="1500" min="1" max="4000">
+                            <input type="number" id="maxTokens" class="text-input" value="4000" min="1" max="4000">
                         </div>
                         <div class="input-group">
                             <label for="temperature" class="label">Temperature: <span id="temperatureValue">0.7</span></label>
