@@ -197,7 +197,6 @@ class AIPromptProcessorPro {
         if (this.elements.fillItUpBtn) {
             // Always show the Fill it up button
             this.elements.fillItUpBtn.style.display = 'block';
-            this.logAction('📝 Fill it up button is always visible');
             console.log('🔍 DEBUG: Button is now always visible');
         } else {
             console.log('🔍 DEBUG: fillItUpBtn element not found!');
